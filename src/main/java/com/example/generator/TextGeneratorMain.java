@@ -41,8 +41,8 @@ public class TextGeneratorMain {
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), character -> index.getAndIncrement()));
 
-//        ComputationGraph graph = buildModel(uniqueCharsIndicesMap.keySet().size());
-//        graph.init();
+        ComputationGraph graph = buildModel(uniqueCharsIndicesMap.keySet().size());
+        graph.init();
 
         List<Integer> allChars = Files.lines(file.toPath())
                 .flatMapToInt(String::chars)
@@ -52,6 +52,10 @@ public class TextGeneratorMain {
         List<List<Integer>> partitions = Lists.partition(allChars, 1001);
 
         for (List<Integer> partition : partitions) {
+
+            if (partition.size() != SEQ_LENGTH + 1){
+                continue;
+            }
 
             List<Integer> firstSubSeq = partition.subList(0, SEQ_LENGTH)
                     .stream()
@@ -106,6 +110,7 @@ public class TextGeneratorMain {
                 .backpropType(BackpropType.TruncatedBPTT)
                 .tBPTTForwardLength(tbpttLength)
                 .tBPTTBackwardLength(tbpttLength)
+                .setOutputs("output")
                 .build();
 
         return new ComputationGraph(config);
