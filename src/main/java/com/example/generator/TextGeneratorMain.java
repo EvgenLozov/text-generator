@@ -52,11 +52,11 @@ public class TextGeneratorMain {
                 int nextCharIndex = uniqueCharsIndicesMap.get( (char) nextChar);
                 charSequence.add(nextCharIndex);
 
-                if (charSequence.size() == SEQ_LENGTH){
+                if (charSequence.size() == SEQ_LENGTH + 1){
                     System.out.println("Processing of the next seq");
 
-                    List<Integer> firstSubSeq = charSequence.subList(0, SEQ_LENGTH - 1);
-                    List<Integer> secondSubSeq = charSequence.subList(1, SEQ_LENGTH);
+                    List<Integer> firstSubSeq = charSequence.subList(0, SEQ_LENGTH);
+                    List<Integer> secondSubSeq = charSequence.subList(1, SEQ_LENGTH + 1);
 
                     INDArray indArray = toINDArray(firstSubSeq);
                     INDArray matrix = toMatrix(secondSubSeq, uniqueCharsIndicesMap.size(), SEQ_LENGTH);
