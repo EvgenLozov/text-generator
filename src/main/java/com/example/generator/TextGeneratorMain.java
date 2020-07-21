@@ -106,7 +106,7 @@ public class TextGeneratorMain {
                 .backpropType(BackpropType.TruncatedBPTT)
                 .tBPTTForwardLength(tbpttLength)
                 .tBPTTBackwardLength(tbpttLength)
-
+                .setOutputs("output")
                 .build();
 
         return new ComputationGraph(config);
