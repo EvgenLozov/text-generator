@@ -11,15 +11,14 @@ import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.learning.config.Adam;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,6 +28,7 @@ import java.util.stream.Collectors;
 public class TextGeneratorMain {
 
     public static final int SEQ_LENGTH = 1000;
+    public static final int BATCH_SIZE = 8;
 
     public static void main(String[] args) throws IOException {
         String fileName = "krasnoe-i-chernoe.txt";
@@ -44,34 +44,46 @@ public class TextGeneratorMain {
         ComputationGraph graph = buildModel(uniqueCharsIndicesMap.keySet().size());
         graph.init();
 
+//        UIServer uiServer = UIServer.getInstance();
+//        StatsStorage ganStatsStorage = new InMemoryStatsStorage();
+//        uiServer.attach(ganStatsStorage);
+//        graph.setListeners(new StatsListener( ganStatsStorage, 100));
+//
         List<Integer> allChars = Files.lines(file.toPath())
                 .flatMapToInt(String::chars)
                 .boxed()
                 .collect(Collectors.toList());
 
-        List<List<Integer>> partitions = Lists.partition(allChars, 1001);
+        int batchCharsCount = (SEQ_LENGTH + 1) * BATCH_SIZE;
+        Lists.partition(allChars, batchCharsCount)
+                .stream()
+                .filter(batchChars -> batchChars.size() == batchCharsCount)
+                .map(batchChars -> batchDataSet(batchChars, uniqueCharsIndicesMap))
+                .forEach(graph::fit);
+    }
 
-        for (List<Integer> partition : partitions) {
+    private static DataSet batchDataSet(List<Integer> batchChars, Map<Integer, Integer> uniqueCharsIndicesMap) {
+        List<DataSet> batchDataSet = Lists.partition(batchChars, SEQ_LENGTH + 1)
+                .stream()
+                .map(seqChars -> {
+                    List<Integer> firstSubSeq = seqChars.subList(0, SEQ_LENGTH)
+                            .stream()
+                            .map(uniqueCharsIndicesMap::get)
+                            .collect(Collectors.toList());
 
-            if (partition.size() != SEQ_LENGTH + 1){
-                continue;
-            }
+                    List<Integer> secondSubSeq = seqChars.subList(1, SEQ_LENGTH + 1)
+                            .stream()
+                            .map(uniqueCharsIndicesMap::get)
+                            .collect(Collectors.toList());
 
-            List<Integer> firstSubSeq = partition.subList(0, SEQ_LENGTH)
-                    .stream()
-                    .map(uniqueCharsIndicesMap::get)
-                    .collect(Collectors.toList());
+                    INDArray indArray = toINDArray(firstSubSeq);
+                    INDArray matrix = toMatrix(secondSubSeq, uniqueCharsIndicesMap.size(), SEQ_LENGTH);
 
-            List<Integer> secondSubSeq = partition.subList(1, SEQ_LENGTH + 1)
-                    .stream()
-                    .map(uniqueCharsIndicesMap::get)
-                    .collect(Collectors.toList());
+                    return new DataSet(indArray, matrix);
+                })
+                .collect(Collectors.toList());
 
-            INDArray indArray = toINDArray(firstSubSeq);
-            INDArray matrix = toMatrix(secondSubSeq, uniqueCharsIndicesMap.size(), SEQ_LENGTH);
-
-            // train logic
-        }
+        return DataSet.merge(batchDataSet);
     }
 
     private static ComputationGraph buildModel(int uniqueCharsCount) {
@@ -118,7 +130,9 @@ public class TextGeneratorMain {
 
     private static INDArray toINDArray(List<Integer> list) {
         double[] doubles = list.stream().mapToDouble(el -> (double) el).toArray();
-        return Nd4j.create(doubles);
+        double[][] result = new double[][]{doubles};
+
+        return Nd4j.create(result);
     }
 
     public static INDArray toMatrix(List<Integer> seq, int size, int maxLength ){
