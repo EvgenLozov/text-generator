@@ -1,5 +1,6 @@
 package com.example.generator;
 
+import com.google.common.collect.Lists;
 import org.deeplearning4j.nn.conf.BackpropType;
 import org.deeplearning4j.nn.conf.ComputationGraphConfiguration;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
@@ -34,40 +35,39 @@ public class TextGeneratorMain {
         File file = new File(fileName);
 
         AtomicInteger index = new AtomicInteger(0);
-        Map<Character, Integer> uniqueCharsIndicesMap = Files.lines(file.toPath())
+        Map<Integer, Integer> uniqueCharsIndicesMap = Files.lines(file.toPath())
                 .flatMapToInt(String::chars)
                 .distinct()
-                .mapToObj(c -> (char) c )
-                .collect(Collectors.toMap(Function.identity(), (c) -> index.getAndIncrement()));
+                .boxed()
+                .collect(Collectors.toMap(Function.identity(), character -> index.getAndIncrement()));
 
-        ComputationGraph graph = buildModel(uniqueCharsIndicesMap.keySet().size());
-        graph.init();
+//        ComputationGraph graph = buildModel(uniqueCharsIndicesMap.keySet().size());
+//        graph.init();
 
-        try ( FileReader fileReader = new FileReader(file)){
-            int nextChar;
-            List<Integer> charSequence = new ArrayList<>();
+        List<Integer> allChars = Files.lines(file.toPath())
+                .flatMapToInt(String::chars)
+                .boxed()
+                .collect(Collectors.toList());
 
-            while ( (nextChar = fileReader.read()) != -1){
+        List<List<Integer>> partitions = Lists.partition(allChars, 1001);
 
-                int nextCharIndex = uniqueCharsIndicesMap.get( (char) nextChar);
-                charSequence.add(nextCharIndex);
+        for (List<Integer> partition : partitions) {
 
-                if (charSequence.size() == SEQ_LENGTH + 1){
-                    System.out.println("Processing of the next seq");
+            List<Integer> firstSubSeq = partition.subList(0, SEQ_LENGTH)
+                    .stream()
+                    .map(uniqueCharsIndicesMap::get)
+                    .collect(Collectors.toList());
 
-                    List<Integer> firstSubSeq = charSequence.subList(0, SEQ_LENGTH);
-                    List<Integer> secondSubSeq = charSequence.subList(1, SEQ_LENGTH + 1);
+            List<Integer> secondSubSeq = partition.subList(1, SEQ_LENGTH + 1)
+                    .stream()
+                    .map(uniqueCharsIndicesMap::get)
+                    .collect(Collectors.toList());
 
-                    INDArray indArray = toINDArray(firstSubSeq);
-                    INDArray matrix = toMatrix(secondSubSeq, uniqueCharsIndicesMap.size(), SEQ_LENGTH);
+            INDArray indArray = toINDArray(firstSubSeq);
+            INDArray matrix = toMatrix(secondSubSeq, uniqueCharsIndicesMap.size(), SEQ_LENGTH);
 
-                    //train logic
-
-                    charSequence.clear();
-                }
-            }
+            // train logic
         }
-
     }
 
     private static ComputationGraph buildModel(int uniqueCharsCount) {
@@ -106,7 +106,6 @@ public class TextGeneratorMain {
                 .backpropType(BackpropType.TruncatedBPTT)
                 .tBPTTForwardLength(tbpttLength)
                 .tBPTTBackwardLength(tbpttLength)
-
                 .build();
 
         return new ComputationGraph(config);
