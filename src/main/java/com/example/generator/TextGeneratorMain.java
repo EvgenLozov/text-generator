@@ -1,7 +1,7 @@
 package com.example.generator;
 
 import com.google.common.collect.Lists;
-import org.deeplearning4j.nn.conf.BackpropType;
+import org.deeplearning4j.api.storage.StatsStorage;
 import org.deeplearning4j.nn.conf.ComputationGraphConfiguration;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.layers.EmbeddingSequenceLayer;
@@ -9,6 +9,10 @@ import org.deeplearning4j.nn.conf.layers.LSTM;
 import org.deeplearning4j.nn.conf.layers.RnnOutputLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.weights.WeightInit;
+import org.deeplearning4j.ui.api.UIServer;
+import org.deeplearning4j.ui.stats.StatsListener;
+import org.deeplearning4j.ui.storage.InMemoryStatsStorage;
+import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
@@ -27,12 +31,15 @@ import java.util.stream.Collectors;
 
 public class TextGeneratorMain {
 
-    public static final int SEQ_LENGTH = 1000;
+    public static final int SEQ_LENGTH = 50;
     public static final int BATCH_SIZE = 8;
 
     public static void main(String[] args) throws IOException {
         String fileName = "krasnoe-i-chernoe.txt";
+        String modelFileName = "model.bin";
+
         File file = new File(fileName);
+        File modelFile = new File(modelFileName);
 
         AtomicInteger index = new AtomicInteger(0);
         Map<Integer, Integer> uniqueCharsIndicesMap = Files.lines(file.toPath())
@@ -44,21 +51,31 @@ public class TextGeneratorMain {
         ComputationGraph graph = buildModel(uniqueCharsIndicesMap.keySet().size());
         graph.init();
 
-//        UIServer uiServer = UIServer.getInstance();
-//        StatsStorage ganStatsStorage = new InMemoryStatsStorage();
-//        uiServer.attach(ganStatsStorage);
-//        graph.setListeners(new StatsListener( ganStatsStorage, 100));
-//
+        UIServer uiServer = UIServer.getInstance();
+        StatsStorage ganStatsStorage = new InMemoryStatsStorage();
+        uiServer.attach(ganStatsStorage);
+        graph.setListeners(new StatsListener( ganStatsStorage, 20));
+
         List<Integer> allChars = Files.lines(file.toPath())
                 .flatMapToInt(String::chars)
                 .boxed()
                 .collect(Collectors.toList());
 
+        AtomicInteger iteration = new AtomicInteger(0);
         int batchCharsCount = (SEQ_LENGTH + 1) * BATCH_SIZE;
         Lists.partition(allChars, batchCharsCount)
                 .stream()
                 .filter(batchChars -> batchChars.size() == batchCharsCount)
                 .map(batchChars -> batchDataSet(batchChars, uniqueCharsIndicesMap))
+                .peek(b -> {
+                    if(iteration.incrementAndGet()%1000 == 0 ){
+                        try {
+                            ModelSerializer.writeModel(graph, modelFile, true);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                })
                 .forEach(graph::fit);
     }
 
@@ -93,7 +110,7 @@ public class TextGeneratorMain {
         int tbpttLength = 50;
 
         ComputationGraphConfiguration config = new NeuralNetConfiguration.Builder()
-                .seed(uniqueCharsCount)
+                .seed(12345)
                 .weightInit(WeightInit.XAVIER)
                 .updater(new Adam(learningRate))
                 .graphBuilder()
@@ -115,13 +132,13 @@ public class TextGeneratorMain {
                 .appendLayer("output", new RnnOutputLayer.Builder(LossFunctions.LossFunction.MCXENT)
                         .activation(Activation.SOFTMAX)
                         .weightInit(WeightInit.XAVIER)
-                        .nIn(charEmbedding)
+                        .nIn(256)
                         .nOut(uniqueCharsCount)
                         .build()
                 )
-                .backpropType(BackpropType.TruncatedBPTT)
-                .tBPTTForwardLength(tbpttLength)
-                .tBPTTBackwardLength(tbpttLength)
+//                .backpropType(BackpropType.TruncatedBPTT)
+//                .tBPTTForwardLength(tbpttLength)
+//                .tBPTTBackwardLength(tbpttLength)
                 .setOutputs("output")
                 .build();
 
