@@ -17,7 +17,7 @@ import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
-import org.nd4j.linalg.learning.config.Adam;
+import org.nd4j.linalg.learning.config.Sgd;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 
 import java.io.File;
@@ -104,7 +104,7 @@ public class TextGeneratorMain {
     }
 
     private static ComputationGraph buildModel(int uniqueCharsCount) {
-        int charEmbedding = 256;
+        int charEmbedding = 128;
         double learningRate = 0.001;
 
         int tbpttLength = 50;
@@ -112,7 +112,7 @@ public class TextGeneratorMain {
         ComputationGraphConfiguration config = new NeuralNetConfiguration.Builder()
                 .seed(12345)
                 .weightInit(WeightInit.XAVIER)
-                .updater(new Adam(learningRate))
+                .updater(new Sgd(learningRate))
                 .graphBuilder()
                 .addInputs("sequence")
                 .addLayer("noisy_input", new EmbeddingSequenceLayer.Builder()
@@ -132,7 +132,7 @@ public class TextGeneratorMain {
                 .appendLayer("output", new RnnOutputLayer.Builder(LossFunctions.LossFunction.MCXENT)
                         .activation(Activation.SOFTMAX)
                         .weightInit(WeightInit.XAVIER)
-                        .nIn(256)
+                        .nIn(128)
                         .nOut(uniqueCharsCount)
                         .build()
                 )
