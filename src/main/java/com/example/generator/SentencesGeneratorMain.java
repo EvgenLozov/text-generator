@@ -29,8 +29,8 @@ public class SentencesGeneratorMain {
     private static final int BATCH_SIZE = 128;
     private static final int EPOCHS = 50;
 
-    private static final int startIndex = 0;
-    private static final int endIndex = 1;
+    private static final int START_INDEX = 0;
+    private static final int END_INDEX = 1;
 
     public static void main(String[] args) throws IOException {
         String examplesFileName = "eng_wikipedia_2010_300K-sentences.txt";
@@ -74,23 +74,32 @@ public class SentencesGeneratorMain {
                         }
                     }
                 })
+                .peek(b -> {
+                    if(iteration.incrementAndGet()%300 == 0 ) {
+                        System.out.println("Generate sequence: " +
+                                generator(uniqueCharsIndices, graph).apply(11)
+                                        .stream()
+                                        .map(String::valueOf)
+                                        .collect(Collectors.joining(",")));
+                    }
+                })
                 .forEach(graph::fit);
     }
 
     private static DataSet toDataSet(List<Integer> charsSeq, int uniqueCharsCount) {
         int maxLength = 51;
 
-        List<Integer> featuresSeq = new ArrayList<>(Collections.nCopies(maxLength, endIndex));
-        featuresSeq.set(0, startIndex);
+        List<Integer> featuresSeq = new ArrayList<>(Collections.nCopies(maxLength, END_INDEX));
+        featuresSeq.set(0, START_INDEX);
         for (int i = 0; i < charsSeq.size(); i++) {
             featuresSeq.set(i+1, charsSeq.get(i));
         }
 
-        List<Integer> labelsSeq = new ArrayList<>(Collections.nCopies(maxLength, endIndex));
+        List<Integer> labelsSeq = new ArrayList<>(Collections.nCopies(maxLength, END_INDEX));
         for (int i = 0; i < charsSeq.size(); i++) {
             labelsSeq.set(i, charsSeq.get(i));
         }
-        labelsSeq.set(charsSeq.size(), endIndex);
+        labelsSeq.set(charsSeq.size(), END_INDEX);
 
         INDArray features = toINDArray(featuresSeq);
         Pair<INDArray, INDArray> labelsWithMasks = toMatrix(labelsSeq, uniqueCharsCount, maxLength);
@@ -138,5 +147,41 @@ public class SentencesGeneratorMain {
         }
 
         return new Pair<>(Nd4j.create(matrix), Nd4j.create(mask));
+    }
+
+    private static Function<Integer, List<Integer>> generator(Map<Integer, Integer> char2index, ComputationGraph graph){
+        return new FunctionBuilder<>(Function.<Integer>identity())
+                .andThen(charNumber -> Nd4j.create(new double[]{charNumber}).reshape(1, 1))
+                .andThen(graph::rnnTimeStep)
+                .andThen(indArrays -> indArrays[0].toFloatVector())
+                .andThen(floats -> IntStream.range(0, char2index.size() + 2)
+                        .boxed()
+                        .collect(Collectors.toMap(Function.identity(), i -> floats[i]))
+                        .entrySet()
+                        .stream()
+                        .sorted((e1, e2) -> Float.compare(e2.getValue(), e1.getValue()))
+                        .limit(1)
+                        .findFirst()
+                        .get()
+                        .getKey()
+                )
+                .<Integer, List<Integer>>wrap(generator -> integer -> {
+                    int charIndex = 0;
+                    List<Integer> indexes = new ArrayList<>();
+                    indexes.add(charIndex);
+
+                    while (charIndex != END_INDEX){
+                        charIndex = generator.apply(integer);
+                        indexes.add(charIndex);
+                    }
+
+                    return indexes;
+                })
+                .andThen(integers -> integers.stream()
+                        .map(char2index::get)
+                        .collect(Collectors.toList())
+                )
+                .<Integer>compose(char2index::get)
+                .getF();
     }
 }
