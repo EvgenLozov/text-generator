@@ -18,15 +18,23 @@ import java.util.stream.IntStream;
 
 public class SeqGeneratorMain {
     public static void main(String[] args) throws IOException {
+        String examplesFileName = "eng_wikipedia_2010_300K-sentences.txt";
         String modelFileName = "model.bin";
-        ComputationGraph graph = ModelSerializer.restoreComputationGraph(new File(modelFileName));
-        Map<Character,Integer> char2index = new HashMap<>();
 
-        Function<Character, List<Integer>> f = new FunctionBuilder<>(Function.<Integer>identity())
+        ComputationGraph graph = ModelSerializer.restoreComputationGraph(new File(modelFileName));
+        File file = new File(examplesFileName);
+
+        Map<Integer, Integer> char2index = uniqueCharsIndices(file);
+        Map<Integer, Integer> index2char = new HashMap<>();
+        for (Map.Entry<Integer, Integer> entry : char2index.entrySet()) {
+            index2char.put(entry.getValue(), entry.getKey());
+        }
+
+        Function<Integer, List<Integer>> f = new FunctionBuilder<>(Function.<Integer>identity())
                 .andThen(charNumber -> Nd4j.create(new double[]{charNumber}).reshape(1, 1))
                 .andThen(graph::rnnTimeStep)
                 .andThen(indArrays -> indArrays[0].toFloatVector())
-                .andThen(floats -> IntStream.range(0, 148)
+                .andThen(floats -> IntStream.range(0, char2index.size() + 2)
                         .boxed()
                         .collect(Collectors.toMap(Function.identity(), i -> floats[i]))
                         .entrySet()
@@ -38,11 +46,11 @@ public class SeqGeneratorMain {
                         .getKey()
                 )
                 .<Integer, List<Integer>>wrap(generator -> integer -> {
-                    int charIndex = 1;
+                    int charIndex = 0;
                     List<Integer> indexes = new ArrayList<>();
                     indexes.add(charIndex);
 
-                    for (int i = 0; i < 100; i++) {
+                    while (charIndex != 1 || indexes.size() < 50){
                         charIndex = generator.apply(charIndex);
                         indexes.add(charIndex);
                     }
@@ -50,12 +58,12 @@ public class SeqGeneratorMain {
                     return indexes;
                 })
                 .andThen(integers -> integers.stream()
-                        .map(char2index::get)
-                        .collect(Collectors.toList())
-                )
-                .<Character>compose(char2index::get)
+                        .filter(i -> i > 1)
+                        .map(index2char::get)
+                        .collect(Collectors.toList()))
                 .getF();
 
+        f.apply(0).forEach(c -> System.out.print((char) c.intValue()));
 
     }
 

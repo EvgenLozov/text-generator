@@ -166,11 +166,11 @@ public class SentencesGeneratorMain {
                         .getKey()
                 )
                 .<Integer, List<Integer>>wrap(generator -> integer -> {
-                    int charIndex = START_INDEX;
+                    int charIndex = 0;
                     List<Integer> indexes = new ArrayList<>();
                     indexes.add(charIndex);
 
-                    while (charIndex != END_INDEX){
+                    while (charIndex != END_INDEX || indexes.size() < 51){
                         charIndex = generator.apply(charIndex);
                         indexes.add(charIndex);
                     }
