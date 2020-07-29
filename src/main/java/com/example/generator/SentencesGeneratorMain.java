@@ -77,7 +77,7 @@ public class SentencesGeneratorMain {
                 .peek(b -> {
                     if(iteration.incrementAndGet()%300 == 0 ) {
                         System.out.println("Generate sequence: " +
-                                generator(uniqueCharsIndices, graph).apply(11)
+                                generator(uniqueCharsIndices, graph).apply(0)
                                         .stream()
                                         .map(String::valueOf)
                                         .collect(Collectors.joining(",")));
@@ -171,7 +171,7 @@ public class SentencesGeneratorMain {
                     indexes.add(charIndex);
 
                     while (charIndex != END_INDEX){
-                        charIndex = generator.apply(integer);
+                        charIndex = generator.apply(charIndex);
                         indexes.add(charIndex);
                     }
 
