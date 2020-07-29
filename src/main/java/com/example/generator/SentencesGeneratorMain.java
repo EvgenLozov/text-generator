@@ -26,7 +26,7 @@ import java.util.stream.IntStream;
 
 public class SentencesGeneratorMain {
 
-    private static final int BATCH_SIZE = 128;
+    private static final int BATCH_SIZE = 8;
     private static final int EPOCHS = 50;
 
     private static final int START_INDEX = 0;
@@ -44,6 +44,12 @@ public class SentencesGeneratorMain {
         ComputationGraph graph = Models.sentencesGenerator(uniqueCharsIndices.keySet().size() + 2);
         graph.init();
 
+        if (modelFile.exists())
+        {
+            graph.setParams(ModelSerializer.restoreComputationGraph(modelFile).params());
+        }
+
+
         UIServer uiServer = UIServer.getInstance();
         StatsStorage ganStatsStorage = new InMemoryStatsStorage();
         uiServer.attach(ganStatsStorage);
@@ -57,6 +63,21 @@ public class SentencesGeneratorMain {
                 .collect(Collectors.toList());
 
         AtomicInteger iteration = new AtomicInteger(0);
+
+        Map<Integer, Integer> index2char = uniqueCharsIndices.entrySet()
+                .stream()
+                .collect(Collectors.toMap(e -> e.getValue(), e-> e.getKey()));
+
+        Function<Integer, String> generator = GeneratorProvider.generator(uniqueCharsIndices, graph, END_INDEX)
+                .andThen(integers -> integers.stream()
+                        .map(index2char::get)
+                        .filter(integer -> integer != null)
+                        .map(integer -> new Character( (char)integer.intValue() ))
+                        .map(String::valueOf)
+                        .collect(Collectors.joining(""))
+
+                );
+
         IntStream.range(0, EPOCHS)
                 .mapToObj(i -> examples)
                 .peek(Collections::shuffle)
@@ -75,12 +96,9 @@ public class SentencesGeneratorMain {
                     }
                 })
                 .peek(b -> {
-                    if(iteration.incrementAndGet()%300 == 0 ) {
+                    if(iteration.incrementAndGet()%100 == 0 ) {
                         System.out.println("Generate sequence: " +
-                                generator(uniqueCharsIndices, graph).apply(11)
-                                        .stream()
-                                        .map(String::valueOf)
-                                        .collect(Collectors.joining(",")));
+                                generator.apply(0));
                     }
                 })
                 .forEach(graph::fit);
@@ -149,39 +167,5 @@ public class SentencesGeneratorMain {
         return new Pair<>(Nd4j.create(matrix), Nd4j.create(mask));
     }
 
-    private static Function<Integer, List<Integer>> generator(Map<Integer, Integer> char2index, ComputationGraph graph){
-        return new FunctionBuilder<>(Function.<Integer>identity())
-                .andThen(charNumber -> Nd4j.create(new double[]{charNumber}).reshape(1, 1))
-                .andThen(graph::rnnTimeStep)
-                .andThen(indArrays -> indArrays[0].toFloatVector())
-                .andThen(floats -> IntStream.range(0, char2index.size() + 2)
-                        .boxed()
-                        .collect(Collectors.toMap(Function.identity(), i -> floats[i]))
-                        .entrySet()
-                        .stream()
-                        .sorted((e1, e2) -> Float.compare(e2.getValue(), e1.getValue()))
-                        .limit(1)
-                        .findFirst()
-                        .get()
-                        .getKey()
-                )
-                .<Integer, List<Integer>>wrap(generator -> integer -> {
-                    int charIndex = 0;
-                    List<Integer> indexes = new ArrayList<>();
-                    indexes.add(charIndex);
 
-                    while (charIndex != END_INDEX){
-                        charIndex = generator.apply(integer);
-                        indexes.add(charIndex);
-                    }
-
-                    return indexes;
-                })
-                .andThen(integers -> integers.stream()
-                        .map(char2index::get)
-                        .collect(Collectors.toList())
-                )
-                .<Integer>compose(char2index::get)
-                .getF();
-    }
 }
