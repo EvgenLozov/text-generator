@@ -15,7 +15,7 @@ class Models {
 
     static ComputationGraph sentencesGenerator(int uniqueCharsCount) {
         int charEmbedding = 128;
-        double learningRate = 0.001;
+        double learningRate = 0.001 * 4;
 
         int tbpttLength = 50;
 

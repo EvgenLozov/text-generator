@@ -22,10 +22,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class SentencesGeneratorMain {
 
-    private static final int BATCH_SIZE = 8;
+    private static final int BATCH_SIZE = 128;
+    private static final int EPOCHS = 50;
 
     private static final int startIndex = 0;
     private static final int endIndex = 1;
@@ -47,16 +49,21 @@ public class SentencesGeneratorMain {
         uiServer.attach(ganStatsStorage);
         graph.setListeners(new StatsListener( ganStatsStorage, 20));
 
-        List<DataSet> dataSets = Files.lines(file.toPath())
+        List<List<Integer>> examples = Files.lines(file.toPath())
                 .map(line -> line.split("\t")[1])
                 .map(line -> trim(line, 50))
+                .filter(line -> line.chars().noneMatch(i -> i > 256))
                 .map(line -> line.chars().mapToObj(uniqueCharsIndices::get).collect(Collectors.toList()))
-                .map(seq -> toDataSet(seq, uniqueCharsIndices.size() + 2))
                 .collect(Collectors.toList());
 
         AtomicInteger iteration = new AtomicInteger(0);
-        Lists.partition(dataSets, BATCH_SIZE)
-                .stream()
+        IntStream.range(0, EPOCHS)
+                .mapToObj(i -> examples)
+                .peek(Collections::shuffle)
+                .flatMap(shuffledDataSet ->  Lists.partition(shuffledDataSet, BATCH_SIZE).stream())
+                .map(batchSeq -> batchSeq.stream()
+                                            .map(b -> toDataSet(b, uniqueCharsIndices.size() + 2))
+                                            .collect(Collectors.toList()))
                 .map(DataSet::merge)
                 .peek(b -> {
                     if(iteration.incrementAndGet()%1000 == 0 ){
@@ -95,6 +102,7 @@ public class SentencesGeneratorMain {
         AtomicInteger index = new AtomicInteger(2);
 
         return Files.lines(file.toPath())
+                .filter(line -> line.chars().noneMatch(i -> i > 256))
                 .flatMapToInt(String::chars)
                 .distinct()
                 .boxed()
