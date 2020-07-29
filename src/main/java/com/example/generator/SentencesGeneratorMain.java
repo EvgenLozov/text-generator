@@ -166,7 +166,7 @@ public class SentencesGeneratorMain {
                         .getKey()
                 )
                 .<Integer, List<Integer>>wrap(generator -> integer -> {
-                    int charIndex = integer;
+                    int charIndex = START_INDEX;
                     List<Integer> indexes = new ArrayList<>();
                     indexes.add(charIndex);
 
@@ -181,7 +181,7 @@ public class SentencesGeneratorMain {
                         .map(char2index::get)
                         .collect(Collectors.toList())
                 )
-                .<Integer>compose(char2index::get)
+//                .<Integer>compose(char2index::get)
                 .getF();
     }
 }
