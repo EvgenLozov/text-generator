@@ -166,7 +166,7 @@ public class SentencesGeneratorMain {
                         .getKey()
                 )
                 .<Integer, List<Integer>>wrap(generator -> integer -> {
-                    int charIndex = 0;
+                    int charIndex = integer;
                     List<Integer> indexes = new ArrayList<>();
                     indexes.add(charIndex);
 
