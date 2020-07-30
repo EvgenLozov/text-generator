@@ -1,7 +1,6 @@
 package com.example.generator;
 
 import org.deeplearning4j.nn.graph.ComputationGraph;
-import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.factory.Nd4j;
 
 import java.io.File;
@@ -21,7 +20,7 @@ public class SeqGeneratorMain {
         String examplesFileName = "eng_wikipedia_2010_300K-sentences.txt";
         String modelFileName = "model.bin";
 
-        ComputationGraph graph = ModelSerializer.restoreComputationGraph(new File(modelFileName));
+        ComputationGraph graph = Models.load(new File(modelFileName));
         File file = new File(examplesFileName);
 
         Map<Integer, Integer> char2index = uniqueCharsIndices(file);
@@ -34,23 +33,20 @@ public class SeqGeneratorMain {
                 .andThen(charNumber -> Nd4j.create(new double[]{charNumber}).reshape(1, 1))
                 .andThen(graph::rnnTimeStep)
                 .andThen(indArrays -> indArrays[0].toFloatVector())
-                .andThen(floats -> IntStream.range(0, char2index.size() + 2)
-                        .boxed()
-                        .collect(Collectors.toMap(Function.identity(), i -> floats[i]))
-                        .entrySet()
-                        .stream()
-                        .sorted((e1, e2) -> Float.compare(e2.getValue(), e1.getValue()))
-                        .limit(1)
-                        .findFirst()
-                        .get()
-                        .getKey()
-                )
+                .andThen(floats -> {
+                            RandomCollection<Integer> rc = new RandomCollection<>();
+                            IntStream.range(0, char2index.size() + 2)
+                                    .boxed()
+                                    .forEach(i -> rc.add(floats[i], i));
+
+                            return rc.next();
+                })
                 .<Integer, List<Integer>>wrap(generator -> integer -> {
                     int charIndex = 0;
                     List<Integer> indexes = new ArrayList<>();
                     indexes.add(charIndex);
 
-                    while (charIndex != 1 || indexes.size() < 50){
+                    while (charIndex != 1){
                         charIndex = generator.apply(charIndex);
                         indexes.add(charIndex);
                     }
@@ -63,7 +59,11 @@ public class SeqGeneratorMain {
                         .collect(Collectors.toList()))
                 .getF();
 
-        f.apply(0).forEach(c -> System.out.print((char) c.intValue()));
+        for (int i = 0; i < 10; i++) {
+            f.apply(0).forEach(c -> System.out.print((char) c.intValue()));
+            System.out.println();
+            graph.rnnClearPreviousState();
+        }
 
     }
 

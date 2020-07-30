@@ -7,22 +7,26 @@ import org.deeplearning4j.nn.conf.layers.LSTM;
 import org.deeplearning4j.nn.conf.layers.RnnOutputLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.weights.WeightInit;
+import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.activations.Activation;
-import org.nd4j.linalg.learning.config.Sgd;
+import org.nd4j.linalg.learning.config.Adam;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
+
+import java.io.File;
+import java.io.IOException;
 
 class Models {
 
     static ComputationGraph sentencesGenerator(int uniqueCharsCount) {
         int charEmbedding = 128;
-        double learningRate = 0.001 * 4;
+        double learningRate = 0.002;
 
         int tbpttLength = 50;
 
         ComputationGraphConfiguration config = new NeuralNetConfiguration.Builder()
                 .seed(12345)
                 .weightInit(WeightInit.XAVIER)
-                .updater(new Sgd(learningRate))
+                .updater(new Adam(learningRate))
                 .graphBuilder()
                 .addInputs("sequence")
                 .addLayer("noisy_input", new EmbeddingSequenceLayer.Builder()
@@ -53,5 +57,9 @@ class Models {
                 .build();
 
         return new ComputationGraph(config);
+    }
+
+    static ComputationGraph load(File modelFile) throws IOException {
+        return ModelSerializer.restoreComputationGraph(modelFile);
     }
 }
