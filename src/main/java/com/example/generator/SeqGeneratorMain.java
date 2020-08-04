@@ -33,13 +33,21 @@ public class SeqGeneratorMain {
                 .andThen(charNumber -> Nd4j.create(new double[]{charNumber}).reshape(1, 1))
                 .andThen(graph::rnnTimeStep)
                 .andThen(indArrays -> indArrays[0].toFloatVector())
-                .andThen(floats -> {
-                            RandomCollection<Integer> rc = new RandomCollection<>();
-                            IntStream.range(0, char2index.size() + 2)
-                                    .boxed()
-                                    .forEach(i -> rc.add(floats[i], i));
+                .andThen(floats -> IntStream.range(0, char2index.size() + 2)
+                        .boxed()
+                        .collect(Collectors.toMap(Function.identity(), i -> floats[i]))
+                        .entrySet()
+                        .stream()
+                        .sorted((e1, e2) -> Float.compare(e2.getValue(), e1.getValue()))
+                        .limit(5)
+                        .map(e -> new Pair<>(e.getKey(), e.getValue()))
+                        .collect(Collectors.toList())
+                )
+                .andThen(ind2Weight -> {
+                    RandomCollection<Integer> rc = new RandomCollection<>();
+                    ind2Weight.forEach(e -> rc.add(e.getSecond(), e.getFirst()));
 
-                            return rc.next();
+                    return rc.next();
                 })
                 .<Integer, List<Integer>>wrap(generator -> integer -> {
                     int charIndex = 0;

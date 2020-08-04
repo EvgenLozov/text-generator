@@ -12,7 +12,9 @@ import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.text.BreakIterator;
 import java.util.ArrayList;
@@ -26,7 +28,7 @@ import java.util.stream.IntStream;
 
 public class SentencesGeneratorMain {
 
-    private static final int BATCH_SIZE = 128;
+    private static final int BATCH_SIZE = 64;
     private static final int EPOCHS = 50;
 
     private static final int START_INDEX = 0;
@@ -41,8 +43,7 @@ public class SentencesGeneratorMain {
 
         Map<Integer, Integer> uniqueCharsIndices = uniqueCharsIndices(file);
 
-        ComputationGraph graph = Models.sentencesGenerator(uniqueCharsIndices.keySet().size() + 2);
-        graph.init();
+        ComputationGraph graph = Models.load(new File(modelFileName));
 
         UIServer uiServer = UIServer.getInstance();
         StatsStorage ganStatsStorage = new InMemoryStatsStorage();
@@ -56,7 +57,16 @@ public class SentencesGeneratorMain {
                 .map(line -> line.chars().mapToObj(uniqueCharsIndices::get).collect(Collectors.toList()))
                 .collect(Collectors.toList());
 
-        AtomicInteger iteration = new AtomicInteger(0);
+        DataSet scoreDataSet = examples.stream()
+                .limit(16)
+                .map(list -> list.stream()
+                                    .map(seq -> toDataSet(list, uniqueCharsIndices.size() + 2))
+                                .collect(Collectors.toList()))
+                .map(DataSet::merge)
+                .findFirst()
+                .get();
+
+        AtomicInteger iteration = new AtomicInteger(1);
         IntStream.range(0, EPOCHS)
                 .mapToObj(i -> examples)
                 .peek(Collections::shuffle)
@@ -66,21 +76,22 @@ public class SentencesGeneratorMain {
                                             .collect(Collectors.toList()))
                 .map(DataSet::merge)
                 .peek(b -> {
-                    if(iteration.incrementAndGet()%1000 == 0 ){
-                        try {
-                            ModelSerializer.writeModel(graph, modelFile, true);
-                        } catch (IOException e) {
+                    if(iteration.get()%200 == 0 ){
+                        try(PrintWriter scoresWriter = new PrintWriter(new FileWriter("scores.txt", true))){
+                            scoresWriter.println(graph.score(scoreDataSet));
+                        } catch (IOException e){
                             e.printStackTrace();
                         }
                     }
                 })
                 .peek(b -> {
-                    if(iteration.incrementAndGet()%300 == 0 ) {
-                        System.out.println("Generate sequence: " +
-                                generator(uniqueCharsIndices, graph).apply(0)
-                                        .stream()
-                                        .map(String::valueOf)
-                                        .collect(Collectors.joining(",")));
+                    if(iteration.incrementAndGet()%1000 == 0 ){
+                        try {
+                            System.out.println("Saving model after " + iteration + "-th iteration");
+                            ModelSerializer.writeModel(graph, modelFile, true);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
                     }
                 })
                 .forEach(graph::fit);
@@ -178,7 +189,6 @@ public class SentencesGeneratorMain {
                         .map(char2index::get)
                         .collect(Collectors.toList())
                 )
-//                .<Integer>compose(char2index::get)
                 .getF();
     }
 }

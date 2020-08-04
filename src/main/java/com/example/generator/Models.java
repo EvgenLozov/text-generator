@@ -19,14 +19,14 @@ class Models {
 
     static ComputationGraph sentencesGenerator(int uniqueCharsCount) {
         int charEmbedding = 128;
-        double learningRate = 0.002;
+        double learningRate = 0.001;
 
         int tbpttLength = 50;
 
         ComputationGraphConfiguration config = new NeuralNetConfiguration.Builder()
                 .seed(12345)
                 .weightInit(WeightInit.XAVIER)
-                .updater(new Adam(learningRate))
+                .updater(new Adam(learningRate, 0, 0.99, 1e-8))
                 .graphBuilder()
                 .addInputs("sequence")
                 .addLayer("noisy_input", new EmbeddingSequenceLayer.Builder()
