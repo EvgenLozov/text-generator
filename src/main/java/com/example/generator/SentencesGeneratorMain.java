@@ -34,16 +34,18 @@ public class SentencesGeneratorMain {
     private static final int START_INDEX = 0;
     private static final int END_INDEX = 1;
 
+    public static final int SENTENCES_LENGTH_LIMIT = 50;
+
     public static void main(String[] args) throws IOException {
-        String examplesFileName = "eng_wikipedia_2010_300K-sentences.txt";
-        String modelFileName = "model.bin";
+        File modelFile = new File("model.bin");
+        File file = new File("eng_wikipedia_2010_300K-sentences.txt");
 
-        File modelFile = new File(modelFileName);
-        File file = new File(examplesFileName);
+        Map<Integer, Integer> uniqueCharsIndices = uniqueCharsIndices(file, 2);
+        int uniqueCharsCount = uniqueCharsIndices.size() + 2;
 
-        Map<Integer, Integer> uniqueCharsIndices = uniqueCharsIndices(file);
-
-        ComputationGraph graph = Models.load(new File(modelFileName));
+        ComputationGraph graph = modelFile.exists()
+                ? SentenceGeneratorModel.load(modelFile)
+                : SentenceGeneratorModel.build(uniqueCharsCount);
 
         UIServer uiServer = UIServer.getInstance();
         StatsStorage ganStatsStorage = new InMemoryStatsStorage();
@@ -52,19 +54,15 @@ public class SentencesGeneratorMain {
 
         List<List<Integer>> examples = Files.lines(file.toPath())
                 .map(line -> line.split("\t")[1])
-                .map(line -> trim(line, 50))
+                .map(line -> trimSentence(line, SENTENCES_LENGTH_LIMIT))
                 .filter(line -> line.chars().noneMatch(i -> i > 256))
                 .map(line -> line.chars().mapToObj(uniqueCharsIndices::get).collect(Collectors.toList()))
                 .collect(Collectors.toList());
 
-        DataSet scoreDataSet = examples.stream()
-                .limit(16)
-                .map(list -> list.stream()
-                                    .map(seq -> toDataSet(list, uniqueCharsIndices.size() + 2))
-                                .collect(Collectors.toList()))
-                .map(DataSet::merge)
-                .findFirst()
-                .get();
+        DataSet scoreDataSet = DataSet.merge(examples.stream()
+                                                    .limit(16)
+                                                    .map(list -> toDataSet(list, uniqueCharsCount))
+                                                    .collect(Collectors.toList()));
 
         AtomicInteger iteration = new AtomicInteger(1);
         IntStream.range(0, EPOCHS)
@@ -72,7 +70,7 @@ public class SentencesGeneratorMain {
                 .peek(Collections::shuffle)
                 .flatMap(shuffledDataSet ->  Lists.partition(shuffledDataSet, BATCH_SIZE).stream())
                 .map(batchSeq -> batchSeq.stream()
-                                            .map(b -> toDataSet(b, uniqueCharsIndices.size() + 2))
+                                            .map(b -> toDataSet(b, uniqueCharsCount))
                                             .collect(Collectors.toList()))
                 .map(DataSet::merge)
                 .peek(b -> {
@@ -98,7 +96,7 @@ public class SentencesGeneratorMain {
     }
 
     private static DataSet toDataSet(List<Integer> charsSeq, int uniqueCharsCount) {
-        int maxLength = 51;
+        int maxLength = SENTENCES_LENGTH_LIMIT + 1;
 
         List<Integer> featuresSeq = new ArrayList<>(Collections.nCopies(maxLength, END_INDEX));
         featuresSeq.set(0, START_INDEX);
@@ -118,8 +116,8 @@ public class SentencesGeneratorMain {
         return new DataSet(features, labelsWithMasks.getFirst(), labelsWithMasks.getSecond(), labelsWithMasks.getSecond());
     }
 
-    private static Map<Integer, Integer> uniqueCharsIndices(File file) throws IOException {
-        AtomicInteger index = new AtomicInteger(2);
+    private static Map<Integer, Integer> uniqueCharsIndices(File file, int initialIndex) throws IOException {
+        AtomicInteger index = new AtomicInteger(initialIndex);
 
         return Files.lines(file.toPath())
                 .filter(line -> line.chars().noneMatch(i -> i > 256))
@@ -129,8 +127,8 @@ public class SentencesGeneratorMain {
                 .collect(Collectors.toMap(Function.identity(), character -> index.getAndIncrement()));
     }
 
-    private static String trim(String line, int limit) {
-        if (line.length() <= 50) {
+    private static String trimSentence(String line, int limit) {
+        if (line.length() <= limit) {
             return line;
         }
 
@@ -160,35 +158,4 @@ public class SentencesGeneratorMain {
         return new Pair<>(Nd4j.create(matrix), Nd4j.create(mask));
     }
 
-    private static Function<Integer, List<Integer>> generator(Map<Integer, Integer> char2index, ComputationGraph graph){
-        return new FunctionBuilder<>(Function.<Integer>identity())
-                .andThen(charNumber -> Nd4j.create(new double[]{charNumber}).reshape(1, 1))
-                .andThen(graph::rnnTimeStep)
-                .andThen(indArrays -> indArrays[0].toFloatVector())
-                .andThen(floats -> {
-                    RandomCollection<Integer> rc = new RandomCollection<>();
-                    IntStream.range(0, char2index.size() + 2)
-                            .boxed()
-                            .forEach(i -> rc.add(floats[i], i));
-
-                    return rc.next();
-                })
-                .<Integer, List<Integer>>wrap(generator -> integer -> {
-                    int charIndex = 0;
-                    List<Integer> indexes = new ArrayList<>();
-                    indexes.add(charIndex);
-
-                    while (charIndex != END_INDEX || indexes.size() < 51){
-                        charIndex = generator.apply(charIndex);
-                        indexes.add(charIndex);
-                    }
-
-                    return indexes;
-                })
-                .andThen(integers -> integers.stream()
-                        .map(char2index::get)
-                        .collect(Collectors.toList())
-                )
-                .getF();
-    }
 }

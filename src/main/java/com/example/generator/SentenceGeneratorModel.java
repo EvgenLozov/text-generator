@@ -15,9 +15,9 @@ import org.nd4j.linalg.lossfunctions.LossFunctions;
 import java.io.File;
 import java.io.IOException;
 
-class Models {
+class SentenceGeneratorModel {
 
-    static ComputationGraph sentencesGenerator(int uniqueCharsCount) {
+    static ComputationGraph build(int uniqueCharsCount) {
         int charEmbedding = 128;
         double learningRate = 0.001;
 
