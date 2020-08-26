@@ -29,7 +29,7 @@ public class WordCorrectorMain {
     private static final int EPOCHS = 50;
 
     public static void main(String[] args) throws IOException {
-        File modelFile = new File("model.bin");
+        File modelFile = new File("modelCorrector.bin");
         File dictionaryFile = new File("words_en.txt");
 
         Map<Integer, Integer> uniqueCharsIndices = uniqueCharsIndices(dictionaryFile);
