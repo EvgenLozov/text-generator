@@ -6,7 +6,6 @@ import org.deeplearning4j.nn.conf.graph.rnn.LastTimeStepVertex;
 import org.deeplearning4j.nn.conf.layers.EmbeddingSequenceLayer;
 import org.deeplearning4j.nn.conf.layers.LSTM;
 import org.deeplearning4j.nn.conf.layers.OutputLayer;
-import org.deeplearning4j.nn.conf.layers.RnnOutputLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.util.ModelSerializer;
@@ -23,7 +22,7 @@ public class WordsCorrectorModel {
     }
 
     public static ComputationGraph build(int uniqueCharsCount) {
-        int charEmbedding = 128;
+        int charEmbedding = 32;
         double learningRate = 0.001;
 
         int tbpttLength = 50;
