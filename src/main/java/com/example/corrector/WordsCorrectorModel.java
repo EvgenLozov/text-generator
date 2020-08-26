@@ -22,8 +22,8 @@ public class WordsCorrectorModel {
         return ModelSerializer.restoreComputationGraph(modelFile);
     }
 
-    public static ComputationGraph build(int uniqueCharsCount) {
-        int charEmbedding = 128;
+    public static ComputationGraph build(int wordsCount) {
+        int charEmbedding = 32;
         double learningRate = 0.001;
 
         int tbpttLength = 50;
@@ -37,7 +37,7 @@ public class WordsCorrectorModel {
                 .addLayer("noisy_input", new EmbeddingSequenceLayer.Builder()
                         .hasBias(false)
                         .activation(Activation.IDENTITY)
-                        .nIn(uniqueCharsCount)
+                        .nIn(wordsCount)
                         .nOut(charEmbedding)
                         .build(), "sequence"
                 )
@@ -53,7 +53,7 @@ public class WordsCorrectorModel {
                         .activation(Activation.SOFTMAX)
                         .weightInit(WeightInit.XAVIER)
                         .nIn(charEmbedding)
-                        .nOut(uniqueCharsCount)
+                        .nOut(wordsCount)
                         .build()
                 )
 //                .backpropType(BackpropType.TruncatedBPTT)

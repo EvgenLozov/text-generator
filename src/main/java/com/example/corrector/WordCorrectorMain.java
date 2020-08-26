@@ -13,8 +13,11 @@ import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +32,7 @@ public class WordCorrectorMain {
     private static final int EPOCHS = 50;
 
     public static void main(String[] args) throws IOException {
-        File modelFile = new File("model.bin");
+        File modelFile = new File("modelCorrector.bin");
         File dictionaryFile = new File("words_en.txt");
 
         Map<Integer, Integer> uniqueCharsIndices = uniqueCharsIndices(dictionaryFile);
@@ -40,7 +43,7 @@ public class WordCorrectorMain {
 
         ComputationGraph graph = modelFile.exists()
                 ? WordsCorrectorModel.load(modelFile)
-                : WordsCorrectorModel.build(uniqueCharsCount);
+                : WordsCorrectorModel.build(allWords.size());
 
         UIServer uiServer = UIServer.getInstance();
         StatsStorage ganStatsStorage = new InMemoryStatsStorage();
@@ -98,7 +101,7 @@ public class WordCorrectorMain {
     }
 
     private static INDArray toLabel(int dictionarySize, int dictionaryPos){
-        INDArray label = Nd4j.create(1, dictionarySize);
+        INDArray label = Nd4j.zeros(1, dictionarySize);
         label.put(0, dictionaryPos, 1);
 
         return label;
@@ -108,7 +111,6 @@ public class WordCorrectorMain {
         AtomicInteger index = new AtomicInteger(0);
 
         return Files.lines(file.toPath())
-                .filter(line -> line.chars().noneMatch(i -> i > 256))
                 .flatMapToInt(String::chars)
                 .distinct()
                 .boxed()
@@ -116,8 +118,10 @@ public class WordCorrectorMain {
     }
 
     private static Pair<INDArray, INDArray> toFeatureWithMask(List<Integer> list, int maxSize) {
-        double[] doubles = list.stream().mapToDouble(el -> (double) el).toArray();
-        double[][] result = new double[][]{doubles};
+        double[] featureDoubles = list.stream().mapToDouble(el -> (double) el).toArray();
+        double[][] result = new double[1][maxSize];
+
+        System.arraycopy(featureDoubles, 0, result[0], 0, featureDoubles.length);
 
         double[][] mask = new double[1][maxSize];
         for (int i = 0; i < list.size(); i++) {
