@@ -1,5 +1,8 @@
 package com.example.generator;
 
+import com.example.FunctionBuilder;
+import com.example.Pair;
+import com.example.RandomCollection;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.nd4j.linalg.factory.Nd4j;
 

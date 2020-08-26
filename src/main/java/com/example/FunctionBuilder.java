@@ -1,4 +1,4 @@
-package com.example.generator;
+package com.example;
 
 import java.util.function.BiFunction;
 import java.util.function.Function;

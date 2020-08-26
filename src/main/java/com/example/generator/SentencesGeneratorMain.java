@@ -1,5 +1,6 @@
 package com.example.generator;
 
+import com.example.Pair;
 import com.google.common.collect.Lists;
 import org.deeplearning4j.api.storage.StatsStorage;
 import org.deeplearning4j.nn.graph.ComputationGraph;
