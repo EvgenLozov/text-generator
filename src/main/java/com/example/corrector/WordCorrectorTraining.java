@@ -26,10 +26,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class WordCorrectorMain {
+public class WordCorrectorTraining {
 
     private static final int BATCH_SIZE = 64;
-    private static final int EPOCHS = 50;
+    private static final int EPOCHS = 100;
 
     public static void main(String[] args) throws IOException {
         File modelFile = new File("modelCorrector.bin");
