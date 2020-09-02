@@ -15,10 +15,10 @@ import java.util.stream.Collectors;
 
 public class WordCorrectionMain {
     public static void main(String[] args) throws IOException {
-        String wordToCorrect = "educatinal";
+        String wordToCorrect = "talking";
 
         File modelFile = new File("modelCorrector.bin");
-        File dictionaryFile = new File("words_en.txt");
+        File dictionaryFile = new File("words_en_12.txt");
 
         Map<Integer, Integer> uniqueCharsIndices = uniqueCharsIndices(dictionaryFile);
 
@@ -33,7 +33,7 @@ public class WordCorrectionMain {
                 .stream()
                 .map(candidateEntry -> new Pair<>(candidateEntry.getKey(), vector.sub(candidateEntry.getValue()).norm2(0).getDouble(0)))
                 .sorted(Comparator.comparingDouble(Pair::getSecond))
-                .limit(3)
+                .limit(5)
                 .collect(Collectors.toList());
 
         System.out.println("Word with a mistake: " + wordToCorrect);

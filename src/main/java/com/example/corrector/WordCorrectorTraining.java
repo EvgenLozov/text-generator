@@ -13,14 +13,9 @@ import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -28,15 +23,19 @@ import java.util.stream.IntStream;
 
 public class WordCorrectorTraining {
 
-    private static final int BATCH_SIZE = 64;
-    private static final int EPOCHS = 100;
+    private static final int BATCH_SIZE = 32;
+    private static final int EPOCHS = 50;
 
     public static void main(String[] args) throws IOException {
         File modelFile = new File("modelCorrector.bin");
-        File dictionaryFile = new File("words_en.txt");
+        File dictionaryFile = new File("dictonary/words_en_1.txt");
 
         Map<Integer, Integer> uniqueCharsIndices = uniqueCharsIndices(dictionaryFile);
-        int uniqueCharsCount = uniqueCharsIndices.size();
+        List<Character> uniqueChars = uniqueCharsIndices.keySet()
+                .stream()
+                .map(c -> Character.toChars(c)[0])
+                .collect(Collectors.toList());
+
 
         List<String> allWords = Files.lines(dictionaryFile.toPath()).collect(Collectors.toList());
         Map<String, Integer> wordsToPositions = wordsToPositions(dictionaryFile);
@@ -64,11 +63,13 @@ public class WordCorrectorTraining {
                                     .map(word -> {
                                         Integer position = wordsToPositions.get(word);
 
-                                        List<Integer> wordChars = word.chars()
+                                        String misspelledWord = maybeMisspell(word, uniqueChars);
+
+                                        List<Integer> misspelledWordChars = misspelledWord.chars()
                                                 .mapToObj(uniqueCharsIndices::get)
                                                 .collect(Collectors.toList());
 
-                                        return toDataSet(wordChars, allWords.size(), position, batchPair.getSecond());
+                                        return toDataSet(misspelledWordChars, allWords.size(), position, batchPair.getSecond());
                                     })
                                     .collect(Collectors.toList()))
                 .map(DataSet::merge)
@@ -131,5 +132,25 @@ public class WordCorrectorTraining {
         return new Pair<>(Nd4j.create(result), Nd4j.create(mask));
     }
 
+    public static String maybeMisspell(String word, List<Character> chars){
+        int letterPos = new Random().nextInt(word.length() - 1) + 1; // do not change the first letter
+        StringBuilder sb = new StringBuilder(word);
 
+        switch (new Random().nextInt(3)){
+            case 0: {
+                sb.deleteCharAt(letterPos);
+                break;
+            }
+            case 1:{
+                int charToSet = new Random().nextInt(chars.size());
+                sb.setCharAt(letterPos, chars.get(charToSet));
+                break;
+            }
+            case 2: {
+                // do nothing
+            }
+        }
+
+        return sb.toString();
+    }
 }
